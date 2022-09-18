@@ -31,5 +31,5 @@ const planSchema = new mongoose.Schema({
     timestamps: true
 });
 
-const Plan = mongoose.model('Plan', planSchema)
+const Plan = mongoose.model('UserPlan', planSchema)
 module.exports = Plan;

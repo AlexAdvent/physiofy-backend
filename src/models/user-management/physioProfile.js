@@ -30,3 +30,7 @@ const physioSchema = new mongoose.Schema(
         timestamps: true,
     }
 );
+
+const PhysioProfile = mongoose.model("PhysioProfile", physioSchema);
+
+module.exports = PhysioProfile;

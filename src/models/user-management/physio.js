@@ -28,13 +28,7 @@ const physioSchema = new mongoose.Schema(
       {
         type: String,
       },
-    ],  
-    emailOTP: {
-      type: String,
-    },
-    phoneOTP: {
-      type: String,
-    },
+    ],
     verifyEmail: {
       type: Boolean,
       default: false,
