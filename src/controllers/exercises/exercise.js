@@ -2,6 +2,8 @@ const createError = require("http-errors");
 const mongoose = require("mongoose");
 
 const exercise = require('./exercise');
+const Category = require('./category');
+const ObjectId = mongoose.Types.ObjectId;
 
 module.exports = {
     addExercise: async (req, res, next) => {
@@ -9,8 +11,8 @@ module.exports = {
             const { 
                 name, 
                 description,
-                category,
-                videoUrl,
+                ParentCategoryId,
+                gif,
                 sortNumber,
             } = req.body;
 
@@ -19,32 +21,28 @@ module.exports = {
                 return next(createError(400, "Name is required"));
             }
 
-            //  check description is not empty
-            if (!description) {
-                return next(createError(400, "Description is required"));
+            //  check ParentCategoryId is not empty and mongoId
+            if (!ParentCategoryId || !ObjectId.isValid(ParentCategoryId)) {
+                return next(createError(400, "ParentCategoryId is required and should be a mongoId"));
             }
 
-            //  check category is not empty
-            if (!category) {
-                return next(createError(400, "Category is required"));
+            //  if sortnumber then check it is integer
+            if (sortNumber && !Number.isInteger(sortNumber)) {
+                return next(createError(400, "Sort number should be an integer"));
             }
 
-            //  check videoUrl is not empty
-            if (!videoUrl) {
-                return next(createError(400, "Video url is required"));
-            }
-
-            //  check sortNumber is not empty and integer
-            if (!sortNumber || !Number.isInteger(sortNumber)) {
-                return next(createError(400, "Sort number is required and should be an integer"));
+            // check if parent category exists
+            const parentCategory = await Category.findById(ParentCategoryId);
+            if (!parentCategory) {
+                return next(createError(400, "Parent category does not exist"));
             }
 
             // create exercise
             const newExercise = new exercise({
                 name,
                 description,
-                category,
-                videoUrl,
+                ParentCategoryId,
+                gif,
                 sortNumber,
             });
 

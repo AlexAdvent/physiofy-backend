@@ -1,8 +1,12 @@
 const createError = require("http-errors");
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
-const Physio = require('../user-management/physio');
-const Otp = require('../auth/otp');
+const Physio = require('../../models/user-management/physio');
+const Otp = require('../../models/auth/otp');
+const generate_otp = require('../../utils/generate_otp');
+const config = require("../../../config");
 
 module.exports = {
   registerGenerateOTP: async (req, res, next) => {
@@ -12,7 +16,7 @@ module.exports = {
       if (!phoneNumber) {
         return res
           .status(400)
-          .send({ error: "Phone number is required", field: "phone" });
+          .send({ error: "Phone number is required", field: "phoneNumber" });
       }
 
       //phone regex E.164 format
@@ -20,46 +24,46 @@ module.exports = {
       if (!phoneRegExp.test(phoneNumber)) {
         return res
           .status(400)
-          .send({ error: "Phone number must be E.164 format", field: "phone" });
+          .send({ error: "Phone number must be E.164 format", field: "phoneNumber" });
       }
 
-        //check if phone number is already registered
-        let physio = await Physio.findOne({ phoneNumber: phone });
-        if (physio) {
-            return res
-            .status(400)
-            .send({ error: "Phone number is already registered", field: "phone" });
-        }
+      //check if phone number is already registered
+      let physio = await Physio.findOne({ phoneNumber: phoneNumber });
+      if (physio) {
+        return res
+          .status(400)
+          .send({ error: "Phone number is already registered", field: "phoneNumber" });
+      }
 
-        //generate otp
-        let otp = generate_otp(4);
+      //generate otp
+      let otp = generate_otp(4);
 
-        //send otp
-        let message = `Your OTP for Physio App is ${otp}`;
-        // let response = await send_sms(phone, message);
- 
-        // save otp and phone number in db
-        let newPhysio = new Physio({
-          phoneNumber: phoneNumber,
-        });
+      //send otp
+      let message = `Your OTP for Physio App is ${otp}`;
+      // let response = await send_sms(phone, message);
 
-        let savedPhysio = await newPhysio.save();
+      // save otp and phone number in db
+      let newPhysio = new Physio({
+        phoneNumber: phoneNumber,
+      });
 
-        let newOtp = new Otp({
-          otp: otp,
-          physioId: savedPhysio._id,
-          type: "register",
-          for: "phone",
-        });
+      let savedPhysio = await newPhysio.save();
 
-        let savedOtp = await newOtp.save();
+      let newOtp = new Otp({
+        otp: otp,
+        physioId: savedPhysio._id,
+        type: "register",
+        for: "phone",
+      });
 
-        // send id
-        return res.status(200).send({ id: savedPhysio._id });
+      let savedOtp = await newOtp.save();
+
+      // send id
+      return res.status(200).send({ id: savedPhysio._id });
 
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next({ message: "internal server error", status: 500 });
     }
   },
 
@@ -91,7 +95,7 @@ module.exports = {
       let physio = await Physio.findById(id);
       if (!physio) {
         return res
-          .status(400)  
+          .status(400)
           .send({ error: "Id does not exist", field: "id" });
       }
 
@@ -104,7 +108,7 @@ module.exports = {
       }
 
       //check if otp is expired
-      let isExpired = await Otp.findOne({ otp: otp, physioId: id, createdAt: { $lte: Date.now() - 300000 } });
+      let isExpired = await Otp.findOne({ otp: otp, physioId: id, createdAt: { $lte: Date.now() - 60 * 1000 * config.OTP_EXPIRE_MINUTE } });
       if (isExpired) {
         return res
           .status(400)
@@ -114,24 +118,40 @@ module.exports = {
       //delete otp
       await Otp.deleteOne({ otp: otp, physioId: id });
 
+      // generate token
+      let token = jwt.sign({ id: id, date: Date.now(), }, config.JWT_SECRET, {
+        expiresIn: config.JWT_EXPIRE_IN,
+      });
+
+      // physio save token in token array and verify phone to true
+      physio.tokenList = [ token ];
+      physio.verifyPhone = true;
+      await physio.save();
+
       //send id
-      return res.status(200).send({ id: id });
+      return res.status(200).send({ token });
 
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next({ message: "internal server error", status: 500 });
     }
   },
 
-  registerDtails : async (req, res, next) => {
+  registerDtails: async (req, res, next) => {
     try {
-      let { id, username,  email, password, confirmPassword } = req.body;
+      let { username, email, password, confirmPassword } = req.body;
 
-      if (!id) {
+      let id = req.physio._id;
+
+      let physio_data = req.physio;
+
+      // check if username, email, password, confirmPassword is empty
+      if(physio_data.username || physio_data.email || physio_data.password){
         return res
           .status(400)
-          .send({ error: "id is required", field: "id" });
+          .send({ error: "Details already filled", field: "details" });
       }
+
 
       if (!username) {
         return res
@@ -204,41 +224,43 @@ module.exports = {
           .send({ error: "password and confirm password do not match", field: "confirmPassword" });
       }
 
-      // check if id is valid
-      let isValidId = mongoose.Types.ObjectId.isValid(id);
-      if (!isValidId) {
-        return res
-          .status(400)
-          .send({ error: "id is not valid", field: "id" });
-      }
+      // hash password with bcrypt and salt
+      let salt = await bcrypt.genSalt(10);
+      let hashedPassword = await bcrypt.hash(password, salt);
 
-      // check if id exists
-      let physio = await Physio.findById(id);
-      if (!physio) {
-        return res
-          .status(400)
-          .send({ error: "id does not exist", field: "id" });
-      }
 
-      // hash password
-      let hashedPassword = await bcrypt.hash(password, 10);
+      // // check if id exists
+      // let physio = await Physio.findById(id);
+      // if (!physio) {
+      //   return res
+      //     .status(400)
+      //     .send({ error: "id does not exist", field: "id" });
+      // }
 
-      // generate token
-      let token = jwt.sign({ id: id }, process.env.JWT_SECRET, { expiresIn: "1d" });
+      // // hash password
+      // let hashedPassword = await bcrypt.hash(password, 10);
+
+      // // generate token
+      // let token = jwt.sign({ id: id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
       // add token in token_list in db
-      await Physio.updateOne({ _id: id }, { $push: { token_list: token }, $set: { username: username, email: email, password: hashedPassword } });
+      await Physio.updateOne({ _id: id }, { $set: { username: username, email: email, salt, password: hashedPassword } });
 
-      // send token
-      return res.status(200).send({ token: token });
+      // response email pending if verify email is false
+      if (!req.physio.verifyEmail) {
+        return res.status(200).send({ message: "email pending" });
+      }
+
+      // response success if verify email is true
+      return res.status(200).send({ message: "success" });
 
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next("internal server error");
     }
   },
 
-  login : async (req, res, next) => {
+  login: async (req, res, next) => {
     try {
       let { username, password } = req.body;
 
@@ -280,51 +302,29 @@ module.exports = {
       return res.status(200).send({ token: token });
 
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next("internal server error");
     }
   },
 
-  logout : async (req, res, next) => {
+  logout: async (req, res, next) => {
     try {
-      let { token } = req.body;
-
-      if (!token) {
-        return res
-          .status(400)
-          .send({ error: "token is required", field: "token" });
-      }
-
-      // check if token is valid
-      let isToken = jwt.verify(token, process.env.JWT_SECRET);
-      if (!isToken) {
-        return res
-          .status(400)
-          .send({ error: "token is not valid", field: "token" });
-      }
-
-      // check if token exists
-      let physio = await Physio.findOne({ token_list: token });
-      if (!physio) {
-        return res
-          .status(400)
-          .send({ error: "token does not exist", field: "token" });
-      }
+      let id = req.physio._id;
 
       // remove token from token_list in db
-      await Physio.updateOne({ _id: physio._id }, { $pull: { token_list: token } });
+      await Physio.updateOne({ _id: id }, { $pull: { token_list: token } });
 
       // send success message
       return res.status(200).send({ message: "logout successful" });
 
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next("internal server error");
     }
   },
 
   // forgot password
-  forgotPasswordGenerateOTP : async (req, res, next) => {
+  forgotPasswordGenerateOTP: async (req, res, next) => {
     try {
       let { emailOrPhone } = req.body;
 
@@ -371,11 +371,11 @@ module.exports = {
             console.log("Email sent: " + info.response);
           }
         });
-      } 
-      
+      }
+
       if (physio.phone) {
         // send otp to phone
-        
+
       }
 
       // save otp in db
@@ -390,15 +390,15 @@ module.exports = {
 
       // send username and id
       return res.status(200).send({ username: physio.username, id: physio._id });
-      
+
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next("internal server error");
     }
   },
 
   // forgot password verify otp
-  forgotPasswordVerifyOTP : async (req, res, next) => {
+  forgotPasswordVerifyOTP: async (req, res, next) => {
     try {
       let { id, otp } = req.body;
 
@@ -434,21 +434,21 @@ module.exports = {
       return res.status(200).send({ message: "otp verified", id: id });
 
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next("internal server error");
     }
 
   },
 
   // forgot password reset password
-  forgotPasswordResetPassword : async (req, res, next) => {
+  forgotPasswordResetPassword: async (req, res, next) => {
     try {
       let { id, password, confirmPassword } = req.body;
 
       if (!id) {
         return res
           .status(400)
-          .send({ error: "id is required", field: "id" });  
+          .send({ error: "id is required", field: "id" });
       }
 
       if (!password) {
@@ -496,8 +496,8 @@ module.exports = {
       return res.status(200).send({ message: "password reset successful" });
 
     } catch (error) {
-        console.log(error);
-        return next("internal server error");
+      console.log(error);
+      return next("internal server error");
     }
   },
 
@@ -509,95 +509,95 @@ module.exports = {
 
 
 
-//   createNewProduct: async (req, res, next) => {
-//     try {
-//       const product = new Product(req.body);
-//       const result = await product.save();
-//       res.send(result);
-//     } catch (error) {
-//       console.log(error.message);
-//       if (error.name === "ValidationError") {
-//         next(createError(422, error.message));
-//         return;
-//       }
-//       next(error);
-//     }
+  //   createNewProduct: async (req, res, next) => {
+  //     try {
+  //       const product = new Product(req.body);
+  //       const result = await product.save();
+  //       res.send(result);
+  //     } catch (error) {
+  //       console.log(error.message);
+  //       if (error.name === "ValidationError") {
+  //         next(createError(422, error.message));
+  //         return;
+  //       }
+  //       next(error);
+  //     }
 
-    /*Or:
-  If you want to use the Promise based approach*/
-    /*
-  const product = new Product({
-    name: req.body.name,
-    price: req.body.price
-  });
-  product
-    .save()
-    .then(result => {
-      console.log(result);
-      res.send(result);
-    })
-    .catch(err => {
-      console.log(err.message);
-    }); 
-    */
-//   },
+  /*Or:
+If you want to use the Promise based approach*/
+  /*
+const product = new Product({
+  name: req.body.name,
+  price: req.body.price
+});
+product
+  .save()
+  .then(result => {
+    console.log(result);
+    res.send(result);
+  })
+  .catch(err => {
+    console.log(err.message);
+  }); 
+  */
+  //   },
 
-//   findProductById: async (req, res, next) => {
-//     const id = req.params.id;
-//     try {
-//       const product = await Product.findById(id);
-//       // const product = await Product.findOne({ _id: id });
-//       if (!product) {
-//         throw createError(404, "Product does not exist.");
-//       }
-//       res.send(product);
-//     } catch (error) {
-//       console.log(error.message);
-//       if (error instanceof mongoose.CastError) {
-//         next(createError(400, "Invalid Product id"));
-//         return;
-//       }
-//       next(error);
-//     }
-//   },
+  //   findProductById: async (req, res, next) => {
+  //     const id = req.params.id;
+  //     try {
+  //       const product = await Product.findById(id);
+  //       // const product = await Product.findOne({ _id: id });
+  //       if (!product) {
+  //         throw createError(404, "Product does not exist.");
+  //       }
+  //       res.send(product);
+  //     } catch (error) {
+  //       console.log(error.message);
+  //       if (error instanceof mongoose.CastError) {
+  //         next(createError(400, "Invalid Product id"));
+  //         return;
+  //       }
+  //       next(error);
+  //     }
+  //   },
 
-//   updateAProduct: async (req, res, next) => {
-//     try {
-//       const id = req.params.id;
-//       const updates = req.body;
-//       const options = { new: true };
+  //   updateAProduct: async (req, res, next) => {
+  //     try {
+  //       const id = req.params.id;
+  //       const updates = req.body;
+  //       const options = { new: true };
 
-//       const result = await Product.findByIdAndUpdate(id, updates, options);
-//       if (!result) {
-//         throw createError(404, "Product does not exist");
-//       }
-//       res.send(result);
-//     } catch (error) {
-//       console.log(error.message);
-//       if (error instanceof mongoose.CastError) {
-//         return next(createError(400, "Invalid Product Id"));
-//       }
+  //       const result = await Product.findByIdAndUpdate(id, updates, options);
+  //       if (!result) {
+  //         throw createError(404, "Product does not exist");
+  //       }
+  //       res.send(result);
+  //     } catch (error) {
+  //       console.log(error.message);
+  //       if (error instanceof mongoose.CastError) {
+  //         return next(createError(400, "Invalid Product Id"));
+  //       }
 
-//       next(error);
-//     }
-//   },
+  //       next(error);
+  //     }
+  //   },
 
-//   deleteAProduct: async (req, res, next) => {
-//     const id = req.params.id;
-//     try {
-//       const result = await Product.findByIdAndDelete(id);
-//       // console.log(result);
-//       if (!result) {
-//         throw createError(404, "Product does not exist.");
-//       }
-//       res.send(result);
-//     } catch (error) {
-//       console.log(error.message);
-//       if (error instanceof mongoose.CastError) {
-//         next(createError(400, "Invalid Product id"));
-//         return;
-//       }
-//       next(error);
-//     }
-//   },
+  //   deleteAProduct: async (req, res, next) => {
+  //     const id = req.params.id;
+  //     try {
+  //       const result = await Product.findByIdAndDelete(id);
+  //       // console.log(result);
+  //       if (!result) {
+  //         throw createError(404, "Product does not exist.");
+  //       }
+  //       res.send(result);
+  //     } catch (error) {
+  //       console.log(error.message);
+  //       if (error instanceof mongoose.CastError) {
+  //         next(createError(400, "Invalid Product id"));
+  //         return;
+  //       }
+  //       next(error);
+  //     }
+  //   },
 };

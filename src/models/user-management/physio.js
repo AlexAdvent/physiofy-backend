@@ -4,25 +4,29 @@ const physioSchema = new mongoose.Schema(
   {
     email: {
       type: String,
-      required: true,
-      unique: true,
       trim: true,
       lowercase: true,
+      unique: true,
+      sparse: true,
     },
     username: {
       type: String,
-      required: true,
       unique: true,
       trim: true,
       lowercase: true,
+      sparse: true,
+    },
+    salt: {
+      type: String,
     },
     password: {
       type: String,
-      required: true,
     },
     phoneNumber: {
       type: Number,
       required: true,
+      unique: true,
+      sparse: true,
     },
     tokenList: [
       {

@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const config = require("../../config");
 const Physio = require('../models/user-management/physio');
 
-const verifyToken = (req, res, next) => {
+const physioVerifyToken = (req, res, next) => {
   const token = req.body.token || req.query.token || req.headers["x-access-token"];
 
   if (!token) {
@@ -13,9 +13,9 @@ const verifyToken = (req, res, next) => {
   try {
     const decoded = jwt.verify(token, config.JWT_SECRET);
     
-    console.log("decoded", decoded);
+    // console.log("decoded", decoded);
 
-    Physio.findOne({_id: decoded._id}, (err, user) => {
+    Physio.findOne({_id: decoded.id}, (err, user) => {
       if (err) {
           return res.status(403).send({error:"Server error"});
       }
@@ -24,11 +24,11 @@ const verifyToken = (req, res, next) => {
           return res.status(403).send({error:"user not found"});
       }
       // check if token is in user token list
-      if (!user.token_list.includes(token)) {
+      if (!user.tokenList.includes(token)) {
           return res.status(403).send({error:"invalid token"});
       }
 
-      req.user = user;
+      req.physio = user;
       next();
     });
   } catch (err) {
@@ -37,4 +37,4 @@ const verifyToken = (req, res, next) => {
   }
 };
 
-module.exports = verifyToken;
+module.exports = physioVerifyToken;

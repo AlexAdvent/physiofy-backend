@@ -7,7 +7,8 @@ module.exports = {
     addCategory: async (req, res, next) => {
         try {
             const { 
-                name, 
+                name,
+                description,
                 sortNumber,
             } = req.body;
 
@@ -24,6 +25,7 @@ module.exports = {
             // create category
             const newCategory = new Category({
                 name,
+                description,
                 sortNumber,
             });
 
@@ -88,7 +90,7 @@ module.exports = {
     updateCategory: async (req, res, next) => {
         try {
             const { id } = req.params;
-            const { name, sortNumber } = req.body;
+            const { name, description, sortNumber } = req.body;
 
             if (!mongoose.Types.ObjectId.isValid(id)) {
                 return next(createError(400, "Invalid category id"));
@@ -102,6 +104,10 @@ module.exports = {
 
             if (name) {
                 category.name = name;
+            }
+
+            if (description) {
+                category.description = description;
             }
 
             if (sortNumber) {

@@ -14,6 +14,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // app.use(express.static("public"));
 
+// log requests with body and params
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path} - ${req.ip}`);
+  console.log("body: ", req.body);
+  console.log("params: ", req.params);
+  next();
+});
+
 // serve express app
 const server = app.listen(Port, () => {
     console.log(`server is running at port http://localhost:${Port}`);
@@ -34,6 +42,7 @@ app.use((req, res, next) => {
 
 //Error handler
 app.use((err, req, res, next) => {
+  console.log("err", err);
   res.status(err.status || 500);
   res.send({
     error: {

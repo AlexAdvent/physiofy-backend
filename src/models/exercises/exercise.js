@@ -9,6 +9,9 @@ const exerciseSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
          ref: 'category'
     },
+    description: {
+        type: String,
+    },
     gif: {
         type: String,
     },

@@ -2,6 +2,7 @@ const createError = require("http-errors");
 const mongoose = require("mongoose");
 
 const Patient = require('../user-management/patient');
+const ObjectId = mongoose.Types.ObjectId;
 
 module.exports = {
     addPatient: async (req, res, next) => {
@@ -13,6 +14,7 @@ module.exports = {
                 email,
                 address,
                 problems,
+                exceriseList
             } = req.body;
 
 
@@ -31,6 +33,11 @@ module.exports = {
                 return next(createError(400, "Problems is required and should be an array of strings"));
             }
 
+            // check exceriseList is array of mogodb ids
+            if (!exceriseList || !Array.isArray(exceriseList) || exceriseList.some(excerise => !ObjectId.isValid(excerise))) {
+                return next(createError(400, "Excerise list is required and should be an array of mogodb ids"));
+            }
+
             // generate patientcode
             const patientCode = Math.floor(100000 + Math.random() * 900000);
 
@@ -43,6 +50,7 @@ module.exports = {
                 address,
                 problems,
                 patientCode,
+                exceriseList
             });
 
             await newPatient.save();
