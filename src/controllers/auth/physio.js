@@ -2,6 +2,7 @@ const createError = require("http-errors");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 
 const Physio = require('../../models/user-management/physio');
 const Otp = require('../../models/auth/otp');
@@ -27,12 +28,14 @@ module.exports = {
           .send({ error: "Phone number must be E.164 format", field: "phoneNumber" });
       }
 
-      //check if phone number is already registered
-      let physio = await Physio.findOne({ phoneNumber: phoneNumber });
-      if (physio) {
-        return res
-          .status(400)
-          .send({ error: "Phone number is already registered", field: "phoneNumber" });
+      //check if phone number exist and username is added
+      let user = await Physio.findOne({ phoneNumber });
+      if (user) {
+        if (user.username) {
+          return res
+            .status(400)
+            .send({ error: "Phone number already exist", field: "phoneNumber" });
+        }
       }
 
       //generate otp
@@ -42,21 +45,36 @@ module.exports = {
       let message = `Your OTP for Physio App is ${otp}`;
       // let response = await send_sms(phone, message);
 
-      // save otp and phone number in db
-      let newPhysio = new Physio({
-        phoneNumber: phoneNumber,
-      });
+      let savedPhysio;
 
-      let savedPhysio = await newPhysio.save();
+      // if not user then create new user
+      if (!user) {
+        let newPhysio = new Physio({
+          phoneNumber,
+        });
 
-      let newOtp = new Otp({
-        otp: otp,
-        physioId: savedPhysio._id,
-        type: "register",
-        for: "phone",
-      });
+        savedPhysio = await newPhysio.save();
+      }else{
+        savedPhysio = user;
+      }
 
-      let savedOtp = await newOtp.save();
+ 
+
+      // let newOtp = new Otp({
+      //   otp: otp,
+      //   physioId: savedPhysio._id,
+      //   type: "register",
+      //   for: "phone",
+      // });
+
+      // let savedOtp = await newOtp.save();
+
+      // update otp and create if not exist
+      let updateOtp = await Otp.findOneAndUpdate(
+        { physioId: savedPhysio._id, type: "register", for: "phone" },
+        { otp: otp },
+        { new: true, upsert: true }
+      );
 
       // send id
       return res.status(200).send({ id: savedPhysio._id });
@@ -100,15 +118,22 @@ module.exports = {
       }
 
       //check if otp is valid
-      let isValidOtp = await Otp.findOne({ otp: otp, physioId: id });
+      let isValidOtp = await Otp.findOne({ physioId: id, type: "register", for: "phone" });
       if (!isValidOtp) {
         return res
           .status(400)
-          .send({ error: "OTP is not valid", field: "otp" });
+          .send({ error: "OTP is not generated", field: "otp" });
       }
 
-      //check if otp is expired
-      let isExpired = await Otp.findOne({ otp: otp, physioId: id, createdAt: { $lte: Date.now() - 60 * 1000 * config.OTP_EXPIRE_MINUTE } });
+      // check otp is match
+      if (otp != isValidOtp.otp) {
+        return res
+          .status(400)
+          .send({ error: "OTP deos not valid", field: "otp" });
+      }
+
+      //check if isValidOtp is expired using updated at
+      let isExpired = isValidOtp.updatedAt.getTime() + 5 * 60 * 1000 < Date.now();
       if (isExpired) {
         return res
           .status(400)
@@ -116,7 +141,7 @@ module.exports = {
       }
 
       //delete otp
-      await Otp.deleteOne({ otp: otp, physioId: id });
+      await Otp.deleteOne({ otp: otp, physioId: id, type: "register", for: "phone" });
 
       // generate token
       let token = jwt.sign({ id: id, date: Date.now(), }, config.JWT_SECRET, {
@@ -256,7 +281,7 @@ module.exports = {
 
     } catch (error) {
       console.log(error);
-      return next("internal server error");
+      return next({ message: "internal server error", status: 500 });
     }
   },
 
@@ -303,7 +328,7 @@ module.exports = {
 
     } catch (error) {
       console.log(error);
-      return next("internal server error");
+      return next({ message: "internal server error", status: 500 });
     }
   },
 
@@ -311,89 +336,101 @@ module.exports = {
     try {
       let id = req.physio._id;
 
+      const token = req.body.token || req.query.token || req.headers["x-access-token"];
+
       // remove token from token_list in db
-      await Physio.updateOne({ _id: id }, { $pull: { token_list: token } });
+      await Physio.updateOne({ _id: id }, { $pull: { tokenList: token } });
 
       // send success message
       return res.status(200).send({ message: "logout successful" });
 
     } catch (error) {
       console.log(error);
-      return next("internal server error");
+      return next({ message: "internal server error", status: 500 });
     }
   },
 
   // forgot password
   forgotPasswordGenerateOTP: async (req, res, next) => {
     try {
-      let { emailOrPhone } = req.body;
+      let { phoneNumber } = req.body;
 
-      if (!emailOrPhone) {
+      if (!phoneNumber) {
         return res
           .status(400)
-          .send({ error: "email or phone is required", field: "emailOrPhone" });
+          .send({ error: "phoneNumber is required", field: "phoneNumber" });
       }
 
       // check if email or phone exists
-      let physio = await Physio.findOne({ $or: [{ email: emailOrPhone }, { phone: emailOrPhone }] });
+      let physio = await Physio.findOne({ phoneNumber: phoneNumber });
       if (!physio) {
         return res
           .status(400)
-          .send({ error: "email or phone does not exist", field: "emailOrPhone" });
+          .send({ error: "phoneNumber does not exist", field: "phoneNumber" });
       }
+      console.log("physio", physio);
+
+      // check username empty
+      if (!physio.username) {
+        return res
+          .status(400)
+          .send({ error: "registration not completed, registered with this number", field: "username" });
+      }
+      
+     
 
       //generate otp
       let otp = generate_otp(4);
 
       // send otp to email or phone
-      if (physio.email) {
-        // send otp to email
-        let transporter = nodemailer.createTransport({
-          service: "gmail",
-          auth: {
-            user: process.env.EMAIL,
-            pass: process.env.PASSWORD
-          }
-        });
+      // if (physio.email) {
+      //   // send otp to email
+      //   let transporter = nodemailer.createTransport({
+      //     service: "gmail",
+      //     auth: {
+      //       user: process.env.EMAIL,
+      //       pass: process.env.PASSWORD
+      //     }
+      //   });
 
-        let mailOptions = {
-          from: process.env.EMAIL,
-          to: physio.email,
-          subject: "Forgot Password",
-          text: `Your OTP is ${otp}`
-        };
+      //   let mailOptions = {
+      //     from: process.env.EMAIL,
+      //     to: physio.email,
+      //     subject: "Forgot Password",
+      //     text: `Your OTP is ${otp}`
+      //   };
 
-        transporter.sendMail(mailOptions, (error, info) => {
-          if (error) {
-            console.log(error);
-            return next("internal server error");
-          } else {
-            console.log("Email sent: " + info.response);
-          }
-        });
-      }
+      //   transporter.sendMail(mailOptions, (error, info) => {
+      //     if (error) {
+      //       console.log(error);
+      //       return next("internal server error");
+      //     } else {
+      //       console.log("Email sent: " + info.response);
+      //     }
+      //   });
+      // }
 
-      if (physio.phone) {
-        // send otp to phone
+      // if (physio.phone) {
+      //   // send otp to phone
 
-      }
+      // }
 
       // save otp in db
-      let newOtp = new Otp({
-        otp: otp,
-        physioId: savedPhysio._id,
-        type: "forgotPassword",
-        for: "phone",
-      });
-
-      let savedOtp = await newOtp.save();
+      // let newOtp = new Otp({
+      //   otp: otp,
+      //   physioId: physio._id,
+      //   type: "forgotPassword",
+      //   for: "phone",
+      // });
+      // update otp in db if already exists for this physio
+      let newOtp = await Otp.findOneAndUpdate({ physioId: physio._id, type: "forgotPassword", for: "phoneEmail" }, { otp: otp }, { new: true, upsert: true });
 
       // send username and id
       return res.status(200).send({ username: physio.username, id: physio._id });
 
     } catch (error) {
       console.log(error);
-      return next("internal server error");
+      return next({ message: "internal server error", status: 500 });
     }
   },
 
@@ -415,27 +452,37 @@ module.exports = {
       }
 
       // check if otp exists
-      let otpChecked = await Otp.findOne({ physioId: id, otp: otp });
+      let otpChecked = await Otp.findOne({ physioId: id, type: "forgotPassword", for: "phoneEmail" });
       if (!otpChecked) {
         return res
           .status(400)
-          .send({ error: "otp does not exist", field: "otp" });
+          .send({ error: "otp does not generated", field: "otp" });
       }
 
-      // check if otp is valid
-      let isOtp = otp.verifyOtp(otp);
-      if (!isOtp) {
+      // check if otp is correct
+      if (otpChecked.otp != otp) {
         return res
           .status(400)
-          .send({ error: "otp is not valid", field: "otp" });
+          .send({ error: "otp is incorrect", field: "otp" });
       }
 
-      // send success message and id
-      return res.status(200).send({ message: "otp verified", id: id });
+      const token_forget_password = crypto.randomBytes(48).toString('base64url');
+      console.log("token_forget_password", token_forget_password);
+
+      // save token in db
+      await Physio.updateOne({ _id: id }, { $set: { tokenForgetPassword: token_forget_password } });
+
+      // delete otp from db
+      await Otp.deleteOne({ _id: otpChecked._id });
+
+
+
+      // send id and token
+      return res.status(200).send({ id: id, token: token_forget_password });
 
     } catch (error) {
       console.log(error);
-      return next("internal server error");
+      return next({ message: "internal server error", status: 500 });
     }
 
   },
@@ -443,7 +490,7 @@ module.exports = {
   // forgot password reset password
   forgotPasswordResetPassword: async (req, res, next) => {
     try {
-      let { id, password, confirmPassword } = req.body;
+      let { id,tokenForgetPassword, password, confirmPassword } = req.body;
 
       if (!id) {
         return res
@@ -451,10 +498,24 @@ module.exports = {
           .send({ error: "id is required", field: "id" });
       }
 
+      if (!tokenForgetPassword) {
+        return res
+          .status(400)
+          .send({ error: "tokenForgetPassword is required", field: "tokenForgetPassword" });
+      }
+
       if (!password) {
         return res
           .status(400)
           .send({ error: "password is required", field: "password" });
+      }
+
+      // check password regex
+      let passwordRegExp = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[a-zA-Z\d]{8,}$/;
+      if (!passwordRegExp.test(password)) {
+        return res
+          .status(400)
+          .send({ error: "password must be 8 characters long and must contain at least one uppercase letter, one lowercase letter and one number", field: "password" });
       }
 
       if (!confirmPassword) {
@@ -470,14 +531,6 @@ module.exports = {
           .send({ error: "password and confirm password are not same", field: "confirmPassword" });
       }
 
-      // check if password is valid
-      let isPassword = passwordValidator.validate(password);
-      if (!isPassword) {
-        return res
-          .status(400)
-          .send({ error: "password is not valid", field: "password" });
-      }
-
       // check if id exists
       let physio = await Physio.findOne({ _id: id });
       if (!physio) {
@@ -486,18 +539,30 @@ module.exports = {
           .send({ error: "id does not exist", field: "id" });
       }
 
-      // hash password
-      let hashedPassword = await bcrypt.hash(password, 10);
+      // check if tokenForgetPassword exists
+      if (physio.tokenForgetPassword !== tokenForgetPassword && physio.tokenForgetPassword !== null && physio.tokenForgetPassword !== "") {
+        return res
+          .status(400)
+          .send({ error: "tokenForgetPassword does not match", field: "tokenForgetPassword" });
+      }
 
-      // update password in db
-      await Physio.updateOne({ _id: id }, { password: hashedPassword });
+      // hash password with bcrypt and salt
+      let salt = await bcrypt.genSalt(10);
+      let hashedPassword = await bcrypt.hash(password, salt);
+
+      // TODO::can remove one of below two lines
+      // update password in db and unset tokenForgetPassword
+      await Physio.updateOne({ _id: id }, { password: hashedPassword, salt  });
+
+      // delete tokenForgetPassword from db
+      await Physio.updateOne({ _id: id }, { $unset: { tokenForgetPassword: "" } });
 
       // send success message
       return res.status(200).send({ message: "password reset successful" });
 
     } catch (error) {
       console.log(error);
-      return next("internal server error");
+      return next({ message: "internal server error", status: 500 });
     }
   },
 

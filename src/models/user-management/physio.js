@@ -33,6 +33,9 @@ const physioSchema = new mongoose.Schema(
         type: String,
       },
     ],
+    tokenForgetPassword: {
+      type: String,
+    },
     verifyEmail: {
       type: Boolean,
       default: false,

@@ -17,7 +17,7 @@ let otpSchema = new mongoose.Schema({
     },
     for: {
         type: String,
-        enum: ["phone", "email"],
+        enum: ["phone", "email", "phoneEmail"],
         required: true,
     },
 },
