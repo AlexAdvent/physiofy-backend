@@ -29,5 +29,5 @@ const exerciseSchema = new mongoose.Schema({
     timestamps: true
 });
 
-const Item = mongoose.model('Item', itemSchema)
-module.exports = Item;
+const Exercise = mongoose.model('Exercise', exerciseSchema)
+module.exports = Exercise;

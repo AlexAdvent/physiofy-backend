@@ -20,5 +20,5 @@ const planSchema = new mongoose.Schema({
     timestamps: true
 });
 
-const Membership = mongoose.model('Plan', planSchema)
-module.exports = Item;
+const Plan = mongoose.model('Plan', planSchema)
+module.exports = Plan;

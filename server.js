@@ -18,7 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path} - ${req.ip}`);
   console.log("body: ", req.body);
-  console.log("params: ", req.params);
+  console.log("query: ", req.query);
   next();
 });
 

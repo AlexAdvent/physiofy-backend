@@ -13,17 +13,29 @@ const physioSchema = new mongoose.Schema(
         lastName: {
             type: String,
         },
+        speciality: {
+            type: String,
+        },
         clinicName: {
             type: String,
         },
-        clinicAddress: {
+        clinicAddressFlat: {
+            type: String,
+        },
+        clinicAddressApartment: {
+            type: String,
+        },
+        clinicAddressPincode: {
+            type: Number,
+        },
+        clinicAddressCity: {
+            type: String,
+        },
+        clinicAddressState: {
             type: String,
         },
         clinicPhoneNumber: {
             type: Number,
-        },
-        speciality: {
-            type: String,
         },
     },
     {

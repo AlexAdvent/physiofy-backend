@@ -4,10 +4,10 @@ const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
 
-const Physio = require('../../models/user-management/physio');
-const Otp = require('../../models/auth/otp');
-const generate_otp = require('../../utils/generate_otp');
-const config = require("../../../config");
+const Physio = require('../../../models/user-management/physio');
+const Otp = require('../../../models/auth/otp');
+const generate_otp = require('../../../utils/generate_otp');
+const config = require("../../../../config");
 
 module.exports = {
   registerGenerateOTP: async (req, res, next) => {
@@ -162,7 +162,7 @@ module.exports = {
     }
   },
 
-  registerDtails: async (req, res, next) => {
+  registerDetails: async (req, res, next) => {
     try {
       let { username, email, password, confirmPassword } = req.body;
 
@@ -317,11 +317,18 @@ module.exports = {
           .send({ error: "password is incorrect", field: "password" });
       }
 
+      // check blocked
+      if (physio.isBlocked) {
+        return res
+          .status(400)
+          .send({ error: "account is blocked", field: "blocked" });
+      }
+
       // generate token
       let token = jwt.sign({ id: physio._id }, process.env.JWT_SECRET, { expiresIn: "1d" });
 
       // add token in token_list in db
-      await Physio.updateOne({ _id: physio._id }, { $push: { token_list: token } });
+      await Physio.updateOne({ _id: physio._id }, { $push: { tokenList: token } });
 
       // send token
       return res.status(200).send({ token: token });
@@ -565,104 +572,4 @@ module.exports = {
       return next({ message: "internal server error", status: 500 });
     }
   },
-
-
-
-
-
-
-
-
-
-  //   createNewProduct: async (req, res, next) => {
-  //     try {
-  //       const product = new Product(req.body);
-  //       const result = await product.save();
-  //       res.send(result);
-  //     } catch (error) {
-  //       console.log(error.message);
-  //       if (error.name === "ValidationError") {
-  //         next(createError(422, error.message));
-  //         return;
-  //       }
-  //       next(error);
-  //     }
-
-  /*Or:
-If you want to use the Promise based approach*/
-  /*
-const product = new Product({
-  name: req.body.name,
-  price: req.body.price
-});
-product
-  .save()
-  .then(result => {
-    console.log(result);
-    res.send(result);
-  })
-  .catch(err => {
-    console.log(err.message);
-  }); 
-  */
-  //   },
-
-  //   findProductById: async (req, res, next) => {
-  //     const id = req.params.id;
-  //     try {
-  //       const product = await Product.findById(id);
-  //       // const product = await Product.findOne({ _id: id });
-  //       if (!product) {
-  //         throw createError(404, "Product does not exist.");
-  //       }
-  //       res.send(product);
-  //     } catch (error) {
-  //       console.log(error.message);
-  //       if (error instanceof mongoose.CastError) {
-  //         next(createError(400, "Invalid Product id"));
-  //         return;
-  //       }
-  //       next(error);
-  //     }
-  //   },
-
-  //   updateAProduct: async (req, res, next) => {
-  //     try {
-  //       const id = req.params.id;
-  //       const updates = req.body;
-  //       const options = { new: true };
-
-  //       const result = await Product.findByIdAndUpdate(id, updates, options);
-  //       if (!result) {
-  //         throw createError(404, "Product does not exist");
-  //       }
-  //       res.send(result);
-  //     } catch (error) {
-  //       console.log(error.message);
-  //       if (error instanceof mongoose.CastError) {
-  //         return next(createError(400, "Invalid Product Id"));
-  //       }
-
-  //       next(error);
-  //     }
-  //   },
-
-  //   deleteAProduct: async (req, res, next) => {
-  //     const id = req.params.id;
-  //     try {
-  //       const result = await Product.findByIdAndDelete(id);
-  //       // console.log(result);
-  //       if (!result) {
-  //         throw createError(404, "Product does not exist.");
-  //       }
-  //       res.send(result);
-  //     } catch (error) {
-  //       console.log(error.message);
-  //       if (error instanceof mongoose.CastError) {
-  //         next(createError(400, "Invalid Product id"));
-  //         return;
-  //       }
-  //       next(error);
-  //     }
-  //   },
 };

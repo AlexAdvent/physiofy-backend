@@ -1,7 +1,7 @@
 const createError = require("http-errors");
 const mongoose = require("mongoose");
 
-const Plan = require('../membership/plan');
+const Plan = require('../../../models/membership/plan');
 const ObjectId = mongoose.Types.ObjectId;
 
 module.exports = {
@@ -12,23 +12,23 @@ module.exports = {
 
             // Check name is not empty
             if (!name) {
-                return next(createError(400, "Name is required"));
+                return res.status(400).send({ error: "Name is required", field: "name" });
             }
 
             // check price is a number and not empty
             if (!price || isNaN(price)) {
-                return next(createError(400, "Price is required"));
+                return res.status(400).send({ error: "Integer Price is required", field: "price" });
             }
 
             // check duration is a number and not empty
             if (!price || isNaN(duration)) {
-                return next(createError(400, "Duration must be a number"));
+                return res.status(400).send({ error: "Integer Duration is required", field: "duration" });
             }
 
             // check if plan already exists
             const checkedPlan = await Plan.findOne({ name });
             if (checkedPlan) {
-                return next(createError(400, "Plan already exists"));
+                return res.status(400).send({ error: "Plan name already exists", field: "name" });
             }
 
             const plan = new Plan({
@@ -46,11 +46,12 @@ module.exports = {
             });
 
         } catch (error) {
-            next(error);
+            console.log("error", error);
+            return next({ message: "internal server error", status: 500 });
         }
     },
 
-    getPlans: async (req, res, next) => {
+    getPlan: async (req, res, next) => {
         try {
             const plans = await Plan.find();
             return res.status(200).json({
@@ -59,7 +60,8 @@ module.exports = {
                 data: plans,
             });
         } catch (error) {
-            next(error);
+            console.log("error", error);
+            return next({ message: "internal server error", status: 500 });
         }
     },
 
@@ -69,40 +71,38 @@ module.exports = {
 
             // Check id is not empty
             if (!id) {
-                return next(createError(400, "Id is required"));
+                // return next(createError(400, "Id is required"));
+                return res.status(400).send({ error: "Id is required", field: "id" });
             }
 
             // check id is valid mongo id
             if (!ObjectId.isValid(id)) {
-                return next(createError(400, "Invalid id"));
+                // return next(createError(400, "Invalid id"));
+                return res.status(400).send({ error: "Invalid id", field: "id" });
             }
 
-            // Check name is not empty
-            if (!name) {
-                return next(createError(400, "Name is required"));
+            // check if plan exists
+            const plan = await Plan.findById(id);
+            if (!plan) {
+                return res.status(400).send({ error: "Plan does not exist", field: "id" });
             }
 
-            // check price is a number and not empty
-            if (!price || isNaN(price)) {
-                return next(createError(400, "Price is required"));
+            // if price then check is a number
+            if (price && isNaN(price)) {
+                return res.status(400).send({ error: "Integer Price is required", field: "price" });
             }
 
-            // check duration is a number and not empty
-            if (!price || isNaN(duration)) {
-                return next(createError(400, "Duration must be a number"));
+            // check duration is a number
+            if (duration && isNaN(duration)) {
+                return res.status(400).send({ error: "Integer Duration is required", field: "duration" });
             }
 
-            // check if plan already exists
-            const checkedPlan = await Plan.findOne({ id });
-            if (!checkedPlan) {
-                return next(createError(400, "Plan does not exist"));
-            }
+            // update plan with new values if provided
+            if (name) plan.name = name;
+            if (price) plan.price = price;
+            if (duration) plan.duration = duration;
 
-            const plan = await Plan.findOneAndUpdate(
-                { id },
-                { name, price, duration },
-                { new: true }
-            );
+            await plan.save();
 
             return res.status(200).json({
                 status: "success",
@@ -110,7 +110,8 @@ module.exports = {
                 data: plan,
             });
         } catch (error) {
-            next(error);
+            console.log("error", error);
+            return next({ message: "internal server error", status: 500 });
         }
     },
 
@@ -120,18 +121,18 @@ module.exports = {
 
             // Check id is not empty
             if (!id) {
-                return next(createError(400, "Id is required"));
+                return res.status(400).send({ error: "Id is required", field: "id" });
             }
 
             // check id is valid mongo id
             if (!ObjectId.isValid(id)) {
-                return next(createError(400, "Invalid id"));
+                return res.status(400).send({ error: "Invalid id", field: "id" });
             }
 
             // check if plan already exists
             const checkedPlan = await Plan.findOne({ id });
             if (!checkedPlan) {
-                return next(createError(400, "Plan does not exist"));
+                return res.status(400).send({ error: "Plan does not exist", field: "id" });
             }
 
             await Plan.findOneAndDelete({ id });
@@ -141,7 +142,7 @@ module.exports = {
                 message: "Plan deleted successfully",
             });
         } catch (error) {
-            next(error);
+            return next({ message: "internal server error", status: 500 });
         }
     }
 };

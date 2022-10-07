@@ -7,7 +7,10 @@ const patientSchema = new mongoose.Schema(
       ref: "Physio",
       required: true,
     },
-    name: {
+    firstName: {
+      type: String,
+    },
+    lastName: {
       type: String,
     },
     phoneNumber: {
@@ -18,8 +21,22 @@ const patientSchema = new mongoose.Schema(
     },
     loginCode: {
       type: String,
+      unique: true,
+      required: true,
     },
     address: {
+      type: String,
+    },
+    pincode: {
+      type: Number,
+    },
+    city: {
+      type: String,
+    },
+    state: {
+      type: String,
+    },
+    country: {
       type: String,
     },
     problems: [
@@ -54,5 +71,5 @@ const patientSchema = new mongoose.Schema(
   }
 );
 
-const Membership = mongoose.model("Plan", planSchema);
-module.exports = Item;
+const Patient = mongoose.model("patient", patientSchema);
+module.exports = Patient;

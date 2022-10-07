@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 module.exports = function () {
-  router.use("/physio", require("./physio")());
-  router.use("/patient", require("./patient")());
+  router.use("/auth", require("./auth")());
+  router.use("/usermanagement", require("./user-management")());
   return router;
 };
