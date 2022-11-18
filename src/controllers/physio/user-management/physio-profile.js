@@ -87,7 +87,7 @@ module.exports = {
                 return res.status(400).json({
                     error: "Clinic Phone Number is required",
                     field: "clinicPhoneNumber",
-                });
+                });    
             }
 
             // validate pincode and check length
@@ -99,9 +99,9 @@ module.exports = {
             }
 
             // validate phone number
-            if (isNaN(clinicPhoneNumber)) {
+            if (isNaN(clinicPhoneNumber) || clinicPhoneNumber.toString().length !== 10) {
                 return res.status(400).json({
-                    error: "Clinic Phone Number must be a number",
+                    error: "Clinic Phone Number is invalid",
                     field: "clinicPhoneNumber",
                 });
             }
@@ -200,9 +200,9 @@ module.exports = {
             if (clinicPhoneNumber) {
 
                 // validate phone number
-                if (isNaN(clinicPhoneNumber)) {
+                if (isNaN(clinicPhoneNumber) || clinicPhoneNumber.toString().length !== 10) {
                     return res.status(400).json({
-                        message: "Clinic Phone Number must be a number"
+                        message: "Clinic Phone Number is invalid"
                     });
                 }
                 
