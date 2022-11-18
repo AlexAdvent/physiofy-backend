@@ -5,6 +5,8 @@ const Patient = require("../../../models/user-management/patient");
 const ObjectId = mongoose.Types.ObjectId;
 
 const generatePatientCode =  require("../../../utils/generate-patient-code");
+const Exercise = require("../../../models/exercises/exercise");
+
 
 module.exports = {
     getProfile : async (req, res, next) => {
@@ -139,4 +141,39 @@ module.exports = {
             });
         }
     },
+
+    // get excercises of patient
+    getExercises : async (req, res, next) => {
+        try {
+            let patientId = req.patient._id; 
+
+            //  get exercise detail from id from exceriseList
+            const patient = await Patient
+                .findOne({ _id : patientId })
+            
+            // get exercise details from exerciseList
+            const exerciseList = patient.exceriseList;
+            const exerciseDetails = await Exercise.find({ _id : { $in : exerciseList } });
+
+
+
+            return res.status(200).json({
+                status: "success",
+                message: "Exercises fetched successfully",
+                data: {
+                    exercises: exerciseDetails   
+                }
+            });
+
+        } catch (err) {
+            console.log("err", err);
+            return res.status(500).json({
+                status: "error",
+                message: "Something went wrong",
+            });
+        }
+    },
+
+
+
 }
