@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 
 const Patient = require("../../../models/user-management/patient");
 const ObjectId = mongoose.Types.ObjectId;
+const Exercise = require("../../../models/exercises/exercise");
 
 const generatePatientCode =  require("../../../utils/generate-patient-code");
 
@@ -335,6 +336,57 @@ module.exports = {
             return res.status(200).json({
                 status: "success",
                 message: "Patient deleted successfully",
+            });
+        } catch (err) {
+            console.log("err", err);
+            return res.status(500).json({
+                status: "error",
+                message: "Something went wrong",
+            });
+        }
+    },
+
+    // update excerise for patient
+    updateExcerise : async (req, res, next) => {
+        try {
+            const { excerise } = req.body;
+
+            const patientId = req.query.patientId;
+            const patient = await Patient.findOne({_id : patientId});
+            console.log("patient", patient, patientId, req.physio._id);
+
+            if (!patient) {
+                return res.status(400).json({
+                    status: "error",
+                    message: "Patient not found",
+                });
+            }
+
+            // check excerise is array of mongoIds
+            if (!Array.isArray(excerise) || excerise.some(exceriseId => !ObjectId.isValid(exceriseId))) {
+                return res.status(400).json({
+                    status: "error",
+                    message: "Excerise should be an array of mongoIds",
+                });
+            }
+
+            // check if all exceriseIds are valid
+            const exceriseIds = await Exercise.find({ _id : { $in : excerise }});
+            if (exceriseIds.length !== excerise.length) {
+                return res.status(400).json({
+                    status: "error",
+                    message: "Excerise id is invalid",
+                });
+            }
+            
+
+            patient.exceriseList = excerise;
+
+            await patient.save();
+
+            return res.status(200).json({
+                status: "success",
+                message: "Excerise updated successfully",
             });
         } catch (err) {
             console.log("err", err);

@@ -20,13 +20,21 @@ module.exports = {
           .send({ error: "Phone number is required", field: "phoneNumber" });
       }
 
-      //phone regex E.164 format
-      let phoneRegExp = /^\+?[1-9]\d{1,14}$/;
-      if (!phoneRegExp.test(phoneNumber)) {
-        return res
-          .status(400)
-          .send({ error: "Phone number must be E.164 format", field: "phoneNumber" });
+      // check length of phone number
+      if (phoneNumber.length !== 10) {
+        return res.status(400).send({
+          error: "Phone number should be 10 digits",
+          field: "phoneNumber",
+        });
       }
+
+      // //phone regex E.164 format
+      // let phoneRegExp = /^\+?[1-9]\d{1,14}$/;
+      // if (!phoneRegExp.test(phoneNumber)) {
+      //   return res
+      //     .status(400)
+      //     .send({ error: "Phone number must be E.164 format", field: "phoneNumber" });
+      // }
 
       //check if phone number exist and username is added
       let user = await Physio.findOne({ phoneNumber });

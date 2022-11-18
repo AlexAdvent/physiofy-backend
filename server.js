@@ -12,13 +12,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-// app.use(express.static("public"));
+app.use(express.static("public"));
+
+// make uploads folder static
+app.use("/uploads", express.static("uploads"));
 
 // log requests with body and params
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.path} - ${req.ip}`);
   console.log("body: ", req.body);
   console.log("query: ", req.query);
+  // token
+  console.log("token: ", req.headers["x-access-token"]);
   next();
 });
 

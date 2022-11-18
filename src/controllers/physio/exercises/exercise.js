@@ -109,6 +109,12 @@ module.exports = {
                     });
                 }
 
+                // get file path in / link style
+                filePath = null;
+                if (req.file) {
+                    const filePath = req.file.path.replace(/\\/g, "/");
+                }
+
                 // create exercise
                 const newExercise = new Exercise({
                     name,
