@@ -62,9 +62,16 @@ module.exports = {
                         status: "error",
                         message: "Phone number should be a number",
                     });
+                const phoneRegExp = /^\d{10}$/;
+                if (!phoneRegExp.test(phoneNumber)) {
+                    return res.status(400).json({
+                        status: "error",
+                        message: "Phone number should be 10 digits",
+                    });
                 }
 
                 patient.phoneNumber = phoneNumber;
+                }
             }
 
             if (email) {
@@ -85,10 +92,10 @@ module.exports = {
 
             if (pincode) {
                 // check is nan
-                if (isNaN(pincode)) {
+                if (isNaN(pincode) || pincode.length !== 6) {
                     return res.status(400).json({
                         status: "error",
-                        message: "Pincode should be a number",
+                        message: "Pincode is invalid",
                     });
                 }
                 patient.pincode = pincode;
@@ -123,7 +130,8 @@ module.exports = {
                 status: "success",
                 message: "Patient updated successfully",
             });
-        } catch (err) {
+            }
+        catch (err) {
             console.log("err", err);
             return res.status(500).json({
                 status: "error",
@@ -131,4 +139,4 @@ module.exports = {
             });
         }
     },
-};
+}

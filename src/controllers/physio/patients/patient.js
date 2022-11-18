@@ -89,18 +89,18 @@ module.exports = {
 
 
             // checkphoneNumber is NAN
-            if (isNaN(phoneNumber)) {
+            if (isNaN(phoneNumber) || phoneNumber.length !== 10) {
                 return res.status(400).json({
                     status: "error",
-                    message: "Phone number should be a number",
+                    message: "Phone number is invalid",
                 });
             }
 
             // check pincode is NAN
-            if (isNaN(pincode)) {
+            if (isNaN(pincode) || pincode.length !== 6) {
                 return res.status(400).json({
                     status: "error",
-                    message: "Pincode should be a number",
+                    message: "Pincode is invalid",
                 });
             }
 
@@ -243,10 +243,10 @@ module.exports = {
 
             if (phoneNumber) {
                 // check is nan
-                if (isNaN(phoneNumber)) {
+                if (isNaN(phoneNumber) || phoneNumber.length !== 10) {
                     return res.status(400).json({
                         status: "error",
-                        message: "Phone number should be a number",
+                        message: "Phone number is invalid",
                     });
                 }
 
