@@ -114,13 +114,13 @@ module.exports = {
                 });
             }
 
-            // check problems is array of strings
-            if (!Array.isArray(problems) || problems.some(problem => typeof problem !== "string")) {
-                return res.status(400).json({
-                    status: "error",
-                    message: "Problems should be an array of strings",
-                });
-            }
+            // // check problems is array of strings
+            // if (!Array.isArray(problems) || problems.some(problem => typeof problem !== "string")) {
+            //     return res.status(400).json({
+            //         status: "error",
+            //         message: "Problems should be an array of strings",
+            //     });
+            // }
 
             // generate patientcode
             const loginCode = await generatePatientCode();
